@@ -7,15 +7,17 @@ import { Model, Mongoose, Schema } from 'mongoose'; // Import Mongoose explicitl
 interface ITenantSchema extends Schema<ITenant & Document> { }
 interface IEmployeeSchema extends Schema<IEmployee & Document> { }
 
+// Models and collections in AppTenants Database apply here
 const companySchemas = new Map<string, IEmployeeSchema>([
   ['employee', employeeSchema as unknown as IEmployeeSchema]
 ]);
 
+// Models or Collections that is in Company Database apply here
 const tenantSchemas = new Map<string, ITenantSchema>([
   ['tenant', tenantSchema as unknown as ITenantSchema]
 ]);
 
-
+// Returns database with name 'dbName'
 async function switchDB(dbName: string, dbSchema: Map<string, any>): Promise<typeof mongoose> {
   const mongoose = await connectDB();
 
@@ -28,7 +30,7 @@ async function switchDB(dbName: string, dbSchema: Map<string, any>): Promise<typ
     if (!Object.keys(db.models).length) {
       dbSchema.forEach((schema, modelName) => {
         console.log(modelName, 'modelName from switchDB');
-        
+        // initialize model or collection with name 'modelName' and schema as structure
         db.model(modelName, schema);
       });
     }
@@ -44,10 +46,13 @@ async function getDbModel<T>(db: Mongoose, modelName: string): Promise<Model<T>>
   return db.model<T>(modelName);
 }
 
+// Creates tenants in AppTenants Database
 async function initTenants() {
   const tenantDB = await switchDB('AppTenants', tenantSchemas);
-  const TenantModel = await getDbModel<ITenantSchema>(tenantDB, 'tenant');
-  await TenantModel.deleteMany({});
+  const TenantModel = await getDbModel<ITenantSchema>(tenantDB, 'tenant')
+
+  // Deleting all previously saved tenants
+  await TenantModel.deleteMany({})
 
   await TenantModel.create({
     name: 'Steve',
@@ -69,20 +74,23 @@ async function initTenants() {
   })
 }
 
+// Return All Tenants from AppTenants Database
 const getAllTenants = async () => {
   const tenantDB = await switchDB('AppTenants', tenantSchemas)
   const tenantModel = await getDbModel(tenantDB, 'tenant')
   const tenants = tenantModel.find({}) as unknown as ITenant[]
-  console.log(tenants, 'tenants from getAllTenants');
+  // console.log(tenants, 'tenants from getAllTenants');
   return tenants
 }
 
+// Creates database for each company based on tenant company name
 async function initEmployees(): Promise<void> {
   const customers = await getAllTenants(); // Assuming getAllTenants returns a Promise<Tenant[]>
 
   const createEmployees = customers.map(async (tenant): Promise<IEmployee> => {
     const companyDB = await switchDB(tenant.companyName, companySchemas);
     const EmployeeModel = await getDbModel<IEmployee>(companyDB, 'employee');
+    // deleting previously saved data from each company collection
     await EmployeeModel.deleteMany({});
 
     return EmployeeModel.create({
@@ -95,6 +103,7 @@ async function initEmployees(): Promise<void> {
   await Promise.all(createEmployees);
 }
 
+// Returns Employees in each company
 const listAllEmployees = async () => {
   const customers = await getAllTenants()
   const mapCustomers = customers.map(async (tenant) => {
@@ -106,6 +115,7 @@ const listAllEmployees = async () => {
   return results
 }
 
+// Starting function
 async function run() {
   await initTenants();
   await initEmployees();
